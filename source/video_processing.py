@@ -46,10 +46,10 @@ class EchoProcess:
 		set to 1 for the pixel that are considered, and Nan for the 
 		cropped pixe
 	left_v: int 2d tuple 
-		coordinates rispectively of the (x_low y_left) of the foreground
+		coordinates respectively of the (x_low y_left) of the foreground
 		mask
 	right_v: int 2d tuple
-		coordinates rispectively of the (x_high, y_right) of the foreground
+		coordinates respectively of the (x_high, y_right) of the foreground
 		mask
 	matrix_3d: 3D float array 
 		matrix that represents the video of the echo
