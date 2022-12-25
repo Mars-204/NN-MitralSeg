@@ -1,5 +1,6 @@
 from synthetic_data import syn_data
 import augmentations
+import cv2
 
 data_folder = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Videos"
 dir_path = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic"

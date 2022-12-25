@@ -7,6 +7,8 @@ import os
 import matplotlib.pyplot as plt
 import augmentations
 from torchvision import transforms
+from numpy import asarray
+from os.path import isfile, join
 #import tensorflow as tf
 from pytorchvideo.transforms import AugMix 
 
@@ -77,18 +79,21 @@ class syn_data(object):
             transforms.Normalize([0.5] * 3, [0.5] * 3)])
 
         # Loading videos from the data folder
-        self.video_list = os.listdir(os.path.join(self.dir_path, str(self.data_folder)))
+        self.video_list = os.listdir(os.path.join(dir_path, str(data_folder)))
+        self.fps = 50
+        #import ipdb; ipdb.set_trace()
+        for i, vid in enumerate(self.video_list):
+            self.video_list[i] = os.path.join( str(data_folder),vid)
 
 
     def syn_video(self):
 
         for i in range(len(self.video_list)):
-            # Converting video to frames
+            # Converting video to frames and applying augmix operation on them
             frames = self.vid2frame(self.video_list[i])
-            # Applying AugMix operation on video data and storing in new folder
-            syn_frames = self.aug(frames)
+
             # Converting frames to video
-            aug_video = self.frame2vid(syn_frames)
+            aug_video = self.frame2vid(frames)
             # Storing synthetic video in new folder
 
         
@@ -98,27 +103,73 @@ class syn_data(object):
 
     def vid2frame(self,video):
         """
-        Converting videos to frame and storing t in new folder
-        """
-        video = cv2.VideoCapture(video)
-        f = os.path(self.dir_path + "/frames")
-        while(video.isOpened()):
-            ret, frame = video.read()
-            print(ret)
-            if ret == False:
-                break
-            cv2.imshow('frame', frame); cv2.waitKey(0)
-            f = cv2.imwrite('my_video_frame.png', frame)
+        Converting video to frame and storing it in new folder
 
-        video.release()
+        Converting video to 3d matrix
+        """
+        cap = cv2.VideoCapture(video)
+        count = 0
+        try:
+        # creating a folder named data
+            if not os.path.exists('data'):
+                os.makedirs('data')
+        
+        # if not created then raise error
+        except OSError:
+            print ('Error: Creating directory of data')
+
+        sec = 0
+        while cap.isOpened():
+            sec = sec + self.fps
+            sec = round(sec,2)
+            cap.set(cv2.CAP_PROP_POS_MSEC,sec*1000)
+            ret, frame = cap.read()
+            if ret:
+                # cv2.imshow('frame', frame); cv2.waitKey(10)
+                frame = transforms.ToPILImage()(frame)
+                frame = self.aug (frame,self.preprocess)
+                frame = asarray(frame)
+                #cv2.imshow('frame', frame); cv2.waitKey(10) 
+                name = './data/frame' + str(count) + '.jpg'
+                cv2.imwrite(name, frame)
+                count += 1
+            else:
+                break
+        cap.release()
         cv2.destroyAllWindows()
-        return f
 
     def frame2vid(self, frames):
         """
         Converting frames to video and storing it in new folder
 
         """
+        pathIn= '/home/patel/mitral/NN-MitralSeg/Augmentation/data/'
+        pathOut = '/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Aug_Videos/video.avi'
+
+        frame_array = []
+        files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
+        #for sorting the file names properly
+        files.sort(key = lambda x: x[5:-4])
+        files.sort()
+        frame_array = []
+        files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
+        #for sorting the file names properly
+        files.sort(key = lambda x: x[5:-4])
+        #import ipdb; ipdb.set_trace()
+        for i in range(len(files)):
+            filename=pathIn + files[i]
+            #reading each files
+            img = cv2.imread(filename)
+            height, width, layers = img.shape
+            size = (width,height)
+            
+            #inserting the frames into an image array
+            frame_array.append(img)
+        out = cv2.VideoWriter(pathOut,cv2.VideoWriter_fourcc(*'DIVX'), self.fps, size)
+        for i in range(len(frame_array)):
+            # writing to a image array
+            out.write(frame_array[i])
+        out.release()
 
 
 
@@ -168,12 +219,13 @@ class syn_data(object):
             depth = mixture_depth if mixture_depth > 0 else np.random.randint(
                 1, 4)
             for _ in range(depth):
-                op = np.random.choice(aug_list)
+                op = aug_list[1]
                 image_aug = op(image_aug, aug_severity)
             # Preprocessing commutes since all coefficients are convex
             mix += ws[i] * self.preprocess(image_aug)
 
         mixed = (1 - m) * self.preprocess(image) + m * mix
+        mixed = transforms.ToPILImage()(mixed)
         return mixed
 
 
