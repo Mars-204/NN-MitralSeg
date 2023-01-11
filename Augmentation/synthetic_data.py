@@ -1,78 +1,35 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import cv2
+import random
 import numpy as np
 import pytorchvideo
 import torch
 import os
 import matplotlib.pyplot as plt
 import augmentations
-from torchvision import transforms
+import tensorly as tl
+import tensorflow as tf
+import glob
+import shutil
+
+from pytorchvideo.transforms import AugMix 
+from tqdm import tqdm
+from natsort import natsorted
 from numpy import asarray
 from os.path import isfile, join
-#import tensorflow as tf
-from pytorchvideo.transforms import AugMix 
-
-
-
-from pytorchvideo.transforms.augmentations import (
-    _AUGMENTATION_MAX_LEVEL,
-    AugmentTransform,
-    _decreasing_int_to_arg,
-    _decreasing_to_arg,
-    _increasing_magnitude_to_arg,
-    _increasing_randomly_negate_to_arg,
-)
-from pytorchvideo.transforms.transforms import OpSampler
-
-
-_AUGMIX_LEVEL_TO_ARG = {
-    "AutoContrast": None,
-    "Equalize": None,
-    "Rotate": _increasing_randomly_negate_to_arg,
-    "Posterize": _decreasing_int_to_arg,
-    "Solarize": _decreasing_to_arg,
-    "ShearX": _increasing_randomly_negate_to_arg,
-    "ShearY": _increasing_randomly_negate_to_arg,
-    "TranslateX": _increasing_randomly_negate_to_arg,
-    "TranslateY": _increasing_randomly_negate_to_arg,
-    "AdjustSaturation": _increasing_magnitude_to_arg,
-    "AdjustContrast": _increasing_magnitude_to_arg,
-    "AdjustBrightness": _increasing_magnitude_to_arg,
-    "AdjustSharpness": _increasing_magnitude_to_arg,
-}
-
-_TRANSFORM_AUGMIX_MAX_PARAMS = {
-    "AutoContrast": None,
-    "Equalize": None,
-    "Rotate": (0, 30),
-    "Posterize": (4, 4),
-    "Solarize": (1, 1),
-    "ShearX": (0, 0.3),
-    "ShearY": (0, 0.3),
-    "TranslateX": (0, 1.0 / 3.0),
-    "TranslateY": (0, 1.0 / 3.0),
-    "AdjustSaturation": (0.1, 1.8),
-    "AdjustContrast": (0.1, 1.8),
-    "AdjustBrightness": (0.1, 1.8),
-    "AdjustSharpness": (0.1, 1.8),
-}
-
-# Hyperparameters for sampling magnitude.
-# sampling_data_type determines whether uniform sampling samples among ints or floats.
-# sampling_min determines the minimum possible value obtained from uniform
-# sampling among floats.
-SAMPLING_AUGMIX_DEFAULT_HPARAS = {"sampling_data_type": "float", "sampling_min": 0.1}
-
+from torchvision import transforms
 
 data_folder = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Videos"
 dir_path = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic"
+frames_dir = '/home/patel/mitral/NN-MitralSeg/Augmentation/data'
 
 class syn_data(object):
 
-    def __init__(self, data_folder, dir_path):
+    def __init__(self, data_folder, dir_path, frames_dir):
 
         self.data_folder = data_folder
         self.dir_path = dir_path
+        self.frames_dir = frames_dir
         # Preprocess for the AugMix function
         self.preprocess = transforms.Compose(
             [transforms.ToTensor(),
@@ -80,8 +37,8 @@ class syn_data(object):
 
         # Loading videos from the data folder
         self.video_list = os.listdir(os.path.join(dir_path, str(data_folder)))
-        self.fps = 50
-        #import ipdb; ipdb.set_trace()
+        self.fps = 1
+        self.aug_list = augmentations.augmentations_all
         for i, vid in enumerate(self.video_list):
             self.video_list[i] = os.path.join( str(data_folder),vid)
 
@@ -91,10 +48,12 @@ class syn_data(object):
         for i in range(len(self.video_list)):
             # Converting video to frames and applying augmix operation on them
             frames = self.vid2frame(self.video_list[i])
-
+            # vid = self.augmix_vid(self.video_list[i])
+            
             # Converting frames to video
-            aug_video = self.frame2vid(frames)
-            # Storing synthetic video in new folder
+            vid_no = i
+            aug_video = self.images_to_video(vid_no,self.frames_dir,fps=30, image_format=".jpg", image_scale_factor=1)
+            #aug_video = self.frame2vid(frames)
 
         
         return aug_video
@@ -117,19 +76,18 @@ class syn_data(object):
         # if not created then raise error
         except OSError:
             print ('Error: Creating directory of data')
-
+        frame_array = []
         sec = 0
+        # import ipdb; ipdb.set_trace()
+        rng = np.random.default_rng()
+        op_list = rng.choice(8,3)
         while cap.isOpened():
-            sec = sec + self.fps
-            sec = round(sec,2)
-            cap.set(cv2.CAP_PROP_POS_MSEC,sec*1000)
             ret, frame = cap.read()
             if ret:
-                # cv2.imshow('frame', frame); cv2.waitKey(10)
+                frame_array.append(frame)
                 frame = transforms.ToPILImage()(frame)
-                frame = self.aug (frame,self.preprocess)
+                frame = self.aug (frame,self.preprocess,op_list)
                 frame = asarray(frame)
-                #cv2.imshow('frame', frame); cv2.waitKey(10) 
                 name = './data/frame' + str(count) + '.jpg'
                 cv2.imwrite(name, frame)
                 count += 1
@@ -145,16 +103,8 @@ class syn_data(object):
         """
         pathIn= '/home/patel/mitral/NN-MitralSeg/Augmentation/data/'
         pathOut = '/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Aug_Videos/video.avi'
-
         frame_array = []
         files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
-        #for sorting the file names properly
-        files.sort(key = lambda x: x[5:-4])
-        files.sort()
-        frame_array = []
-        files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
-        #for sorting the file names properly
-        files.sort(key = lambda x: x[5:-4])
         #import ipdb; ipdb.set_trace()
         for i in range(len(files)):
             filename=pathIn + files[i]
@@ -171,7 +121,50 @@ class syn_data(object):
             out.write(frame_array[i])
         out.release()
 
+    def augmix_vid(self,video):
+        """
+        Converting video to frame and storing it in new folder
 
+        Converting video to 3d matrix
+        """
+        cap = cv2.VideoCapture(video)
+        count = 0
+        try:
+        # creating a folder named data
+            if not os.path.exists('data'):
+                os.makedirs('data')
+        
+        # if not created then raise error
+        except OSError:
+            print ('Error: Creating directory of data')
+        frame_array = []
+        sec = 0
+        while cap.isOpened():
+            # sec = sec + self.fps
+            # sec = round(sec,2)
+            # cap.set(cv2.CAP_PROP_POS_MSEC,sec*1000)
+            ret, frame = cap.read()
+            if ret:
+                frame_array.append(frame)
+                # cv2.imshow('frame', frame); cv2.waitKey(10)
+                # frame = transforms.ToPILImage()(frame)
+                # frame = self.aug (frame,self.preprocess)
+                # frame = asarray(frame)
+                #cv2.imshow('frame', frame); cv2.waitKey(10) 
+                name = './data/frame' + str(count) + '.jpg'
+                cv2.imwrite(name, frame)
+                count += 1
+            else:
+                break
+        import ipdb ; ipdb.set_trace()
+        vid_tensor = tl.tensor(frame_array)
+        vid_tensor = torch.from_numpy(vid_tensor).type(torch.Tensor)
+        vid_tensor = vid_tensor.permute(0,3,1,2)
+        aug = AugMix()
+        vid_tensor2 = aug(vid_tensor)
+        cap.release()
+        cv2.destroyAllWindows()
+        return vid_tensor
 
     """
     Implementation of AUGMIX as implemented in AUGMIX paper
@@ -186,7 +179,7 @@ class syn_data(object):
     ]
 
 
-    def aug(self,image, preprocess):
+    def aug(self,image, preprocess, op_list):
         """Perform AugMix augmentations and compute mixture.
 
         Args:
@@ -208,7 +201,7 @@ class syn_data(object):
                 aug_severity = 3
             
             
-        aug_list = augmentations.augmentations_all
+        # aug_list = augmentations.augmentations_all
 
         ws = np.float32(np.random.dirichlet([1] * mixture_width))
         m = np.float32(np.random.beta(1, 1))
@@ -219,7 +212,8 @@ class syn_data(object):
             depth = mixture_depth if mixture_depth > 0 else np.random.randint(
                 1, 4)
             for _ in range(depth):
-                op = aug_list[1]
+                # op = np.random.choice(aug_list)  # shear_x, shear_y, translate_x, translate_y doesn't work????
+                op = self.aug_list[op_list[i]]
                 image_aug = op(image_aug, aug_severity)
             # Preprocessing commutes since all coefficients are convex
             mix += ws[i] * self.preprocess(image_aug)
@@ -228,7 +222,39 @@ class syn_data(object):
         mixed = transforms.ToPILImage()(mixed)
         return mixed
 
+    def images_to_video(self, vid_no, frames_dir, fps, image_scale_factor, image_format):
+        """
+            frames_dir: folder in which images are present
+            fps: frame rate (frames per second) for the output video 
+            image_scale_factor: Factor by which images is resized. =1 if we dont want to resize 
+            image_format: Format of images: .png or jpg (or other -> not tested)
+        """
+        # Getting all frames
+        frame_dir = self.frames_dir + "/" + f"*{image_format}"
+        frames = glob.glob(frame_dir)
+        frames = natsorted(frames)
 
+        # Get images size
+        # import ipdb; ipdb.set_trace()
+        img = cv2.imread(frames[0])
+        height, width, channels = img.shape
+        size = (int(width*image_scale_factor), int(height*image_scale_factor))
+
+        # Video writer Object
+        video_out_dir = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Synthetic_video/" + "video_" + str(vid_no) + ".avi"
+        out = cv2.VideoWriter(video_out_dir, cv2.VideoWriter_fourcc('M','J','P','G'), fps, size)
+
+        for frame in tqdm(frames):
+            img = cv2.imread(frame)
+            img = cv2.resize(img, (0,0), fx=image_scale_factor, fy=image_scale_factor)
+            out.write(img)
+        
+        out.release()
+        print("Video saved to: ", video_out_dir)
+        print("Completed")
+        shutil.rmtree('/home/patel/mitral/NN-MitralSeg/Augmentation/data')
+
+        return
 # class AugMixDataset(torch.utils.data.Dataset):
 #   """Dataset wrapper to perform AugMix augmentation."""
 

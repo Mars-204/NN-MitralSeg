@@ -144,6 +144,9 @@ augmentations = [
 ]
 
 augmentations_all = [
-    autocontrast, equalize, posterize, rotate, solarize, shear_x, shear_y,
+   autocontrast, equalize, posterize, rotate, solarize, shear_x, shear_y,
     translate_x, translate_y, color, contrast, brightness, sharpness
+]
+augmentations_all = [
+   autocontrast, equalize, posterize, rotate, solarize, color, contrast, brightness, sharpness
 ]
