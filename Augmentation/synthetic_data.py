@@ -8,10 +8,10 @@ import os
 import matplotlib.pyplot as plt
 import augmentations
 import tensorly as tl
-import tensorflow as tf
 import glob
 import shutil
 
+from pathlib import Path
 from pytorchvideo.transforms import AugMix 
 from tqdm import tqdm
 from natsort import natsorted
@@ -30,14 +30,13 @@ class syn_data(object):
         self.data_folder = data_folder
         self.dir_path = dir_path
         self.frames_dir = frames_dir
-        # Preprocess for the AugMix function
+        ## Preprocess for the AugMix function
         self.preprocess = transforms.Compose(
             [transforms.ToTensor(),
             transforms.Normalize([0.5] * 3, [0.5] * 3)])
 
-        # Loading videos from the data folder
+        ## Loading videos from the data folder
         self.video_list = os.listdir(os.path.join(dir_path, str(data_folder)))
-        self.fps = 1
         self.aug_list = augmentations.augmentations_all
         for i, vid in enumerate(self.video_list):
             self.video_list[i] = os.path.join( str(data_folder),vid)
@@ -46,13 +45,18 @@ class syn_data(object):
     def syn_video(self):
 
         for i in range(len(self.video_list)):
-            # Converting video to frames and applying augmix operation on them
+            self.vid_name = Path(self.video_list[i]).stem
+
+            ## Converting video to frames and applying augmix operation on them
             frames = self.vid2frame(self.video_list[i])
             # vid = self.augmix_vid(self.video_list[i])
-            
-            # Converting frames to video
-            vid_no = i
-            aug_video = self.images_to_video(vid_no,self.frames_dir,fps=30, image_format=".jpg", image_scale_factor=1)
+            # import ipdb; ipdb.set_trace()
+
+            ## Converting frames to video
+            try:
+                aug_video = self.images_to_video(self.frames_dir,fps=30, image_format=".jpg", image_scale_factor=1)
+            except:
+                print(self.vid_name)    
             #aug_video = self.frame2vid(frames)
 
         
@@ -88,6 +92,7 @@ class syn_data(object):
                 frame = transforms.ToPILImage()(frame)
                 frame = self.aug (frame,self.preprocess,op_list)
                 frame = asarray(frame)
+                self.frame = frame
                 name = './data/frame' + str(count) + '.jpg'
                 cv2.imwrite(name, frame)
                 count += 1
@@ -95,31 +100,32 @@ class syn_data(object):
                 break
         cap.release()
         cv2.destroyAllWindows()
+        return self.frame
 
-    def frame2vid(self, frames):
-        """
-        Converting frames to video and storing it in new folder
+    # def frame2vid(self, frames):
+    #     """
+    #     Converting frames to video and storing it in new folder
 
-        """
-        pathIn= '/home/patel/mitral/NN-MitralSeg/Augmentation/data/'
-        pathOut = '/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Aug_Videos/video.avi'
-        frame_array = []
-        files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
-        #import ipdb; ipdb.set_trace()
-        for i in range(len(files)):
-            filename=pathIn + files[i]
-            #reading each files
-            img = cv2.imread(filename)
-            height, width, layers = img.shape
-            size = (width,height)
+    #     """
+    #     pathIn= '/home/patel/mitral/NN-MitralSeg/Augmentation/data/'
+    #     pathOut = '/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Aug_Videos/video.avi'
+    #     frame_array = []
+    #     files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
+    #     #import ipdb; ipdb.set_trace()
+    #     for i in range(len(files)):
+    #         filename=pathIn + files[i]
+    #         #reading each files
+    #         img = cv2.imread(filename)
+    #         height, width, layers = img.shape
+    #         size = (width,height)
             
-            #inserting the frames into an image array
-            frame_array.append(img)
-        out = cv2.VideoWriter(pathOut,cv2.VideoWriter_fourcc(*'DIVX'), self.fps, size)
-        for i in range(len(frame_array)):
-            # writing to a image array
-            out.write(frame_array[i])
-        out.release()
+    #         #inserting the frames into an image array
+    #         frame_array.append(img)
+    #     out = cv2.VideoWriter(pathOut,cv2.VideoWriter_fourcc(*'DIVX'), self.fps, size)
+    #     for i in range(len(frame_array)):
+    #         # writing to a image array
+    #         out.write(frame_array[i])
+    #     out.release()
 
     def augmix_vid(self,video):
         """
@@ -197,8 +203,8 @@ class syn_data(object):
         except Exception as e:
                 all_ops = True
                 mixture_depth = -1
-                mixture_width = 3
-                aug_severity = 3
+                mixture_width = 2
+                aug_severity = 1
             
             
         # aug_list = augmentations.augmentations_all
@@ -222,7 +228,7 @@ class syn_data(object):
         mixed = transforms.ToPILImage()(mixed)
         return mixed
 
-    def images_to_video(self, vid_no, frames_dir, fps, image_scale_factor, image_format):
+    def images_to_video(self, frames_dir, fps, image_scale_factor, image_format):
         """
             frames_dir: folder in which images are present
             fps: frame rate (frames per second) for the output video 
@@ -231,8 +237,8 @@ class syn_data(object):
         """
         # Getting all frames
         frame_dir = self.frames_dir + "/" + f"*{image_format}"
-        frames = glob.glob(frame_dir)
-        frames = natsorted(frames)
+        self.frames = glob.glob(frame_dir)
+        frames = natsorted(self.frames)
 
         # Get images size
         # import ipdb; ipdb.set_trace()
@@ -241,7 +247,7 @@ class syn_data(object):
         size = (int(width*image_scale_factor), int(height*image_scale_factor))
 
         # Video writer Object
-        video_out_dir = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Synthetic_video/" + "video_" + str(vid_no) + ".avi"
+        video_out_dir = "/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Synthetic_video/" + self.vid_name + ".avi"
         out = cv2.VideoWriter(video_out_dir, cv2.VideoWriter_fourcc('M','J','P','G'), fps, size)
 
         for frame in tqdm(frames):
