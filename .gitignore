@@ -13,3 +13,4 @@ notebooks/legacy/
 notebooks/
 data/in/raw/echo_net/
 Augmentation/Echo_data/EchoNet-Dynamic/
+data/

@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image, ImageOps, ImageEnhance
 
 # ImageNet code should change this value
-IMAGE_SIZE = 32
+IMAGE_SIZE = 112
 
 
 def int_parameter(level, maxval):
@@ -147,6 +147,6 @@ augmentations_all = [
    autocontrast, equalize, posterize, rotate, solarize, shear_x, shear_y,
     translate_x, translate_y, color, contrast, brightness, sharpness
 ]
-augmentations_all = [
-   autocontrast, equalize, posterize, rotate, solarize, color, contrast, brightness, sharpness
-]
+# augmentations_all = [
+#    autocontrast, equalize, posterize, rotate, solarize, color, contrast, brightness, sharpness
+# ]

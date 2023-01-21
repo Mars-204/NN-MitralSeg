@@ -10,6 +10,7 @@ import augmentations
 import tensorly as tl
 import glob
 import shutil
+import random
 
 from pathlib import Path
 from pytorchvideo.transforms import AugMix 
@@ -85,6 +86,8 @@ class syn_data(object):
         # import ipdb; ipdb.set_trace()
         rng = np.random.default_rng()
         op_list = rng.choice(8,3)
+        # op_list = np.random.randint(0,8)
+        print(op_list)
         while cap.isOpened():
             ret, frame = cap.read()
             if ret:
@@ -102,30 +105,6 @@ class syn_data(object):
         cv2.destroyAllWindows()
         return self.frame
 
-    # def frame2vid(self, frames):
-    #     """
-    #     Converting frames to video and storing it in new folder
-
-    #     """
-    #     pathIn= '/home/patel/mitral/NN-MitralSeg/Augmentation/data/'
-    #     pathOut = '/home/patel/mitral/NN-MitralSeg/Augmentation/Echo_data/EchoNet-Dynamic/Aug_Videos/video.avi'
-    #     frame_array = []
-    #     files = [f for f in os.listdir(pathIn) if isfile(join(pathIn, f))]
-    #     #import ipdb; ipdb.set_trace()
-    #     for i in range(len(files)):
-    #         filename=pathIn + files[i]
-    #         #reading each files
-    #         img = cv2.imread(filename)
-    #         height, width, layers = img.shape
-    #         size = (width,height)
-            
-    #         #inserting the frames into an image array
-    #         frame_array.append(img)
-    #     out = cv2.VideoWriter(pathOut,cv2.VideoWriter_fourcc(*'DIVX'), self.fps, size)
-    #     for i in range(len(frame_array)):
-    #         # writing to a image array
-    #         out.write(frame_array[i])
-    #     out.release()
 
     def augmix_vid(self,video):
         """
@@ -202,7 +181,7 @@ class syn_data(object):
                 aug_severity = config.aug_severity
         except Exception as e:
                 all_ops = True
-                mixture_depth = -1
+                mixture_depth = 3
                 mixture_width = 2
                 aug_severity = 1
             
@@ -217,11 +196,13 @@ class syn_data(object):
             image_aug = image.copy()
             depth = mixture_depth if mixture_depth > 0 else np.random.randint(
                 1, 4)
-            for _ in range(depth):
-                # op = np.random.choice(aug_list)  # shear_x, shear_y, translate_x, translate_y doesn't work????
-                op = self.aug_list[op_list[i]]
+            for j in range(depth):
+                # op = np.random.choice(self.aug_list)  # shear_x, shear_y, translate_x, translate_y doesn't work????
+                op = self.aug_list[op_list[j]]
+                # import ipdb;ipdb.set_trace()
                 image_aug = op(image_aug, aug_severity)
             # Preprocessing commutes since all coefficients are convex
+            # import ipdb; ipdb.set_trace()
             mix += ws[i] * self.preprocess(image_aug)
 
         mixed = (1 - m) * self.preprocess(image) + m * mix

@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # current time for file names
     date_time = time.strftime("%Y%m%d-%H%M%S")
     print("Time:", date_time)
-
+    # import ipdb;ipdb.set_trace()
     # check if gpu is available
     if torch.cuda.is_available():
         device = 'cuda:' + str(get_free_gpu())

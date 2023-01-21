@@ -122,6 +122,7 @@ class SegNNMF(MitralSeg):
         self.embedding_opt.zero_grad()
         embedding_loss = mse_x_loss + self.embedding_mult * embedding_reg + \
                          self.spat_temp_mult * (spatial_ref + temporal_reg)
+        torch.autograd.set_detect_anomaly(True)
         embedding_loss.backward(retain_graph=True)
         if valve:
             valve_frames = [int(list(v.keys())[0])-1 for v in valve]
@@ -186,7 +187,7 @@ class SegNNMF(MitralSeg):
                 # backward and step
                 self.train_neu_mf(mse_x_loss)
 
-                self.train_embedding(mse_x_loss, embedding_reg, spatial_reg, temporal_reg)
+                self.train_embedding(mse_x_loss.clone(), embedding_reg, spatial_reg, temporal_reg)
                 self.train_threshold(mse_xs_loss, l1_loss, l21_loss)
 
                 # update x_hat and s

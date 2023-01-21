@@ -42,3 +42,10 @@ tensorboard --logdir runs/*
   year={2020},
   publisher={Elsevier}
 }
+
+## Git ref
+```
+git status
+git add .
+git commit -m 'your message here'
+git push origin develop
